@@ -26,11 +26,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run typecheck
-        run: npm run typecheck
-
-      - name: Run build
-        run: npm run build
-
       - name: Run tests with coverage
         run: npm run test:coverage
+
+      - name: Run performance benchmark
+        run: npm run bench

@@ -1,14 +1,13 @@
 import { repairJson } from "../src/repair.js";
-import { parsePartialJson } from "../src/parse.js";
 
 console.log("=================================================");
-console.log("🚀 stream-json-repair Performance Benchmark");
+console.log("🚀 stream-json-repair Performance Benchmark (Pure JS)");
 console.log("=================================================\n");
 
 const samples = [
   {
     name: "Truncated Object with Deep Nesting",
-    input: '{"user": {"profile": {"name": "Alice", "skills": ["TS", "Node"',
+    input: '{"user": {"profile": {"name": "Alice", "skills": ["JS", "Node"',
   },
   {
     name: "Streaming Array of Objects",

@@ -29,11 +29,11 @@ describe("repairJson", () => {
     });
 
     it("closes deeply nested objects and arrays", () => {
-      const input = '{"user": {"profile": {"skills": ["TypeScript", "Node.js"';
-      const expected = '{"user": {"profile": {"skills": ["TypeScript", "Node.js"]}}}';
+      const input = '{"user": {"profile": {"skills": ["JavaScript", "Node.js"';
+      const expected = '{"user": {"profile": {"skills": ["JavaScript", "Node.js"]}}}';
       expect(repairJson(input)).toBe(expected);
       expect(JSON.parse(repairJson(input))).toEqual({
-        user: { profile: { skills: ["TypeScript", "Node.js"] } },
+        user: { profile: { skills: ["JavaScript", "Node.js"] } },
       });
     });
 

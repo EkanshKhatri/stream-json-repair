@@ -55,3 +55,48 @@ export interface StreamSnapshot<T = unknown> {
    */
   isComplete: boolean;
 }
+
+/**
+ * Result returned by safe parsing.
+ */
+export type SafeParseResult<T> =
+  | { success: true; data: T }
+  | { success: false; error: Error };
+
+/**
+ * Repairs a truncated, partial, or malformed JSON string into valid parseable JSON.
+ */
+export function repairJson(input: string, options?: RepairOptions): string;
+
+/**
+ * Repairs and parses an incomplete or streaming JSON string into a typed JavaScript object/value.
+ */
+export function parsePartialJson<T = unknown>(
+  input: string,
+  options?: RepairOptions
+): T | undefined;
+
+/**
+ * Safely parses an incomplete or streaming JSON string without throwing errors.
+ */
+export function safeParsePartialJson<T = unknown>(
+  input: string,
+  options?: RepairOptions
+): SafeParseResult<T>;
+
+/**
+ * Creates an AsyncGenerator that consumes chunks from an AsyncIterable<string>
+ * and yields updated parsed snapshots as tokens stream in.
+ */
+export function parseJsonStream<T = unknown>(
+  asyncIterable: AsyncIterable<string>,
+  options?: StreamJsonOptions
+): AsyncGenerator<StreamSnapshot<T>, void, unknown>;
+
+/**
+ * Creates a standard Web API TransformStream that transforms a stream of string chunks
+ * into a stream of StreamSnapshot<T> objects.
+ */
+export function createJsonTransformStream<T = unknown>(
+  options?: StreamJsonOptions
+): TransformStream<string, StreamSnapshot<T>>;

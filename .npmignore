@@ -1,10 +1,7 @@
-src/
 tests/
 bench/
 examples/
 .github/
-tsconfig.json
-tsup.config.ts
-vitest.config.ts
+coverage/
 *.log
 .DS_Store

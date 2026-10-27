@@ -5,7 +5,7 @@ import { parseJsonStream } from "../src/index.js";
  * streaming LLM token chunks (OpenAI, Anthropic Claude, Google Gemini, Ollama).
  */
 async function main() {
-  console.log("Simulating real-time AI token stream...\n");
+  console.log("Simulating real-time AI token stream (Pure JavaScript)...\n");
 
   // Simulated token chunks arriving over a network connection
   const tokenChunks = [
@@ -27,16 +27,8 @@ async function main() {
     }
   }
 
-  interface Recipe {
-    title: string;
-    prep_time_minutes: number;
-    servings: number;
-    ingredients: string[];
-    instructions: string[];
-  }
-
   let step = 1;
-  for await (const snapshot of parseJsonStream<Recipe>(simulateNetworkStream())) {
+  for await (const snapshot of parseJsonStream(simulateNetworkStream())) {
     console.log(`[Token #${step++}] Status: ${snapshot.isComplete ? "COMPLETE" : "STREAMING"}`);
     console.log("Live State:", JSON.stringify(snapshot.value));
     console.log("-----------------------------------------------------------------");

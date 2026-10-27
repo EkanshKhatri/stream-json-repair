@@ -3,13 +3,12 @@ import { parseJsonStream, createJsonTransformStream } from "../src/stream.js";
 
 describe("parseJsonStream", () => {
   it("progressively yields updated partial objects as token chunks arrive", async () => {
-    // Simulating token chunks from an LLM stream (e.g. OpenAI or Gemini)
     const tokens = [
       '{"user":',
       ' {"name": "Alice"',
       ', "age": 28',
       ', "skills": ["AI"',
-      ', "TypeScript"]}}',
+      ', "JavaScript"]}}',
     ];
 
     async function* tokenGenerator() {
@@ -18,36 +17,48 @@ describe("parseJsonStream", () => {
       }
     }
 
-    const snapshots: any[] = [];
-    for await (const snapshot of parseJsonStream<{ user: { name: string; age: number; skills: string[] } }>(
-      tokenGenerator()
-    )) {
+    const snapshots = [];
+    for await (const snapshot of parseJsonStream(tokenGenerator())) {
       snapshots.push(snapshot);
     }
 
     expect(snapshots.length).toBeGreaterThan(0);
 
-    // Verify first snapshot had partial state
     expect(snapshots[0].value).toHaveProperty("user");
 
-    // Verify final snapshot is complete
     const finalSnapshot = snapshots[snapshots.length - 1];
     expect(finalSnapshot.isComplete).toBe(true);
     expect(finalSnapshot.value).toEqual({
       user: {
         name: "Alice",
         age: 28,
-        skills: ["AI", "TypeScript"],
+        skills: ["AI", "JavaScript"],
       },
     });
+  });
+
+  it("triggers onError callback if an unexpected error occurs during streaming", async () => {
+    let errorCalled = false;
+    async function* tokenGenerator() {
+      yield "invalid json that triggers error";
+    }
+
+    for await (const _ of parseJsonStream(tokenGenerator(), {
+      onError: () => {
+        errorCalled = true;
+      },
+    })) {
+      // noop
+    }
+    expect(true).toBe(true);
   });
 });
 
 describe("createJsonTransformStream", () => {
   it("works with Web API ReadableStream pipeline", async () => {
-    const chunks = ['{"title": "Doc', 'umentation", "tags": ["npm", "ts"]', "}"];
+    const chunks = ['{"title": "Doc', 'umentation", "tags": ["npm", "js"]', "}"];
 
-    const readable = new ReadableStream<string>({
+    const readable = new ReadableStream({
       start(controller) {
         for (const chunk of chunks) {
           controller.enqueue(chunk);
@@ -56,12 +67,10 @@ describe("createJsonTransformStream", () => {
       },
     });
 
-    const transformedStream = readable.pipeThrough(
-      createJsonTransformStream<{ title: string; tags: string[] }>()
-    );
+    const transformedStream = readable.pipeThrough(createJsonTransformStream());
 
     const reader = transformedStream.getReader();
-    const results: any[] = [];
+    const results = [];
 
     while (true) {
       const { done, value } = await reader.read();
@@ -75,25 +84,7 @@ describe("createJsonTransformStream", () => {
     expect(results[2].isComplete).toBe(true);
     expect(results[2].value).toEqual({
       title: "Documentation",
-      tags: ["npm", "ts"],
+      tags: ["npm", "js"],
     });
-  });
-
-  it("triggers onError callback if an unexpected error occurs during streaming", async () => {
-    let errorCalled = false;
-    async function* tokenGenerator() {
-      yield "invalid json that triggers error";
-    }
-
-    // Pass custom onError option
-    for await (const _ of parseJsonStream(tokenGenerator(), {
-      onError: () => {
-        errorCalled = true;
-      },
-    })) {
-      // noop
-    }
-    // Stream should complete without throwing unhandled exceptions
-    expect(true).toBe(true);
   });
 });

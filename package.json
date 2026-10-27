@@ -3,30 +3,30 @@
   "version": "1.0.0",
   "description": "Ultra-fast, zero-dependency streaming JSON parser & repair engine for LLM token streams (OpenAI, Gemini, Claude, Ollama) that auto-completes incomplete JSON in real-time.",
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "types": "./index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "types": "./index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
     }
   },
   "files": [
-    "dist",
+    "src",
+    "index.d.ts",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
     "test": "vitest run",
+    "test:native": "node --test tests/*.test.js",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest",
-    "bench": "tsx bench/benchmark.ts",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run typecheck && npm run build && npm test"
+    "bench": "node bench/benchmark.js",
+    "example": "node examples/basic-usage.js",
+    "example:stream": "node examples/openai-stream.js",
+    "prepublishOnly": "npm test"
   },
   "keywords": [
     "json",
@@ -42,7 +42,9 @@
     "parser",
     "streaming-json",
     "zero-dependency",
-    "transform-stream"
+    "transform-stream",
+    "javascript",
+    "nodejs"
   ],
   "author": "Ekansh Khatri <ekanshkhatri@gmail.com>",
   "license": "MIT",
@@ -55,11 +57,7 @@
   },
   "homepage": "https://github.com/ekanshkhatri/stream-json-repair#readme",
   "devDependencies": {
-    "@types/node": "^26.6.5",
-    "@vitest/coverage-v8": "^5.0.5",
-    "tsup": "^9.0.0",
-    "tsx": "^4.23.15",
-    "typescript": "^5.9.3",
-    "vitest": "^5.0.5"
+    "@vitest/coverage-v8": "^3.0.7",
+    "vitest": "^3.0.7"
   }
 }

@@ -1,6 +1,11 @@
-import type { RepairOptions } from "./types.js";
+/**
+ * @typedef {Object} RepairOptions
+ * @property {boolean} [stripMarkdown=true] - If true, automatically strips markdown code blocks and conversational text.
+ * @property {*} [incompleteValue=null] - Value to assign when an object key has a trailing colon without a value.
+ * @property {boolean} [normalizeQuotes=true] - If true, converts single quotes to valid double quotes.
+ */
 
-const DEFAULT_OPTIONS: Required<RepairOptions> = {
+const DEFAULT_OPTIONS = {
   stripMarkdown: true,
   incompleteValue: null,
   normalizeQuotes: true,
@@ -9,12 +14,12 @@ const DEFAULT_OPTIONS: Required<RepairOptions> = {
 /**
  * Repairs a truncated, partial, or malformed JSON string into valid parseable JSON.
  *
- * @param input - The raw or streaming JSON string to repair.
- * @param options - Customization options for stripping markdown, fallback values, etc.
- * @returns A guaranteed valid JSON string that can be parsed with `JSON.parse()`.
+ * @param {string} input - The raw or streaming JSON string to repair.
+ * @param {RepairOptions} [options] - Customization options for stripping markdown, fallback values, etc.
+ * @returns {string} A guaranteed valid JSON string that can be parsed with `JSON.parse()`.
  */
-export function repairJson(input: string, options?: RepairOptions): string {
-  const opts: Required<RepairOptions> = { ...DEFAULT_OPTIONS, ...options };
+export function repairJson(input, options = {}) {
+  const opts = { ...DEFAULT_OPTIONS, ...options };
 
   if (!input || typeof input !== "string") {
     return "";
@@ -47,8 +52,10 @@ export function repairJson(input: string, options?: RepairOptions): string {
 
 /**
  * Extracts JSON content if wrapped in markdown code blocks or preceded by LLM explanations.
+ * @param {string} text
+ * @returns {string}
  */
-function extractJsonFromMarkdown(text: string): string {
+function extractJsonFromMarkdown(text) {
   let cleaned = text.trim();
 
   // Handle opening markdown code fences like ```json, ```JSON, or ```
@@ -101,13 +108,16 @@ function extractJsonFromMarkdown(text: string): string {
 /**
  * State machine parser that tracks brackets, strings, escapes, and literals
  * to synthesize a complete and valid JSON document.
+ * @param {string} text
+ * @param {RepairOptions} opts
+ * @returns {string}
  */
-function runStateMachineRepair(text: string, opts: Required<RepairOptions>): string {
+function runStateMachineRepair(text, opts) {
   let result = "";
-  const stack: Array<"{" | "["> = [];
+  const stack = [];
 
   let inString = false;
-  let stringQuoteChar: '"' | "'" = '"';
+  let stringQuoteChar = '"';
   let isEscaped = false;
   let lastNonWhitespace = "";
 
@@ -115,7 +125,7 @@ function runStateMachineRepair(text: string, opts: Required<RepairOptions>): str
   let i = 0;
 
   while (i < len) {
-    const char = text[i]!;
+    const char = text[i];
 
     // Inside a string literal
     if (inString) {
@@ -181,7 +191,7 @@ function runStateMachineRepair(text: string, opts: Required<RepairOptions>): str
     // Start of string
     if (char === '"' || (char === "'" && opts.normalizeQuotes)) {
       inString = true;
-      stringQuoteChar = char as '"' | "'";
+      stringQuoteChar = char;
       result += '"';
       lastNonWhitespace = '"';
       i++;
@@ -282,7 +292,7 @@ function runStateMachineRepair(text: string, opts: Required<RepairOptions>): str
 
   // 6. Close all remaining unclosed containers from the stack
   while (stack.length > 0) {
-    const top = stack.pop()!;
+    const top = stack.pop();
     result = removeTrailingComma(result);
     if (top === "{") {
       result += "}";
@@ -304,14 +314,14 @@ function runStateMachineRepair(text: string, opts: Required<RepairOptions>): str
 /**
  * Closes an unclosed string safely, handling trailing single backslashes
  * and incomplete Unicode escapes (\uXXXX).
+ * @param {string} str
+ * @param {boolean} endsWithBackslash
+ * @returns {string}
  */
-function closeUnterminatedString(str: string, endsWithBackslash: boolean): string {
+function closeUnterminatedString(str, endsWithBackslash) {
   if (endsWithBackslash) {
-    // A single backslash at the end would escape our closing quote!
-    // Turn it into an escaped backslash: \\
     str += "\\";
   } else {
-    // Check if ends with incomplete unicode escape e.g. \u or \u0 or \u123
     const unicodeMatch = str.match(/\\u([0-9a-fA-F]{0,3})$/);
     if (unicodeMatch && unicodeMatch[1] !== undefined) {
       const missingZeros = 4 - unicodeMatch[1].length;
@@ -323,9 +333,10 @@ function closeUnterminatedString(str: string, endsWithBackslash: boolean): strin
 
 /**
  * Autocompletes trailing incomplete numbers or boolean/null literals.
+ * @param {string} str
+ * @returns {string}
  */
-function autocompleteTrailingLiteral(str: string): string {
-  // Check trailing word fragment
+function autocompleteTrailingLiteral(str) {
   const trailingWord = str.match(/([a-zA-Z]+)$/);
   if (trailingWord && trailingWord[1]) {
     const word = trailingWord[1];
@@ -340,7 +351,6 @@ function autocompleteTrailingLiteral(str: string): string {
     }
   }
 
-  // Check trailing number fragments e.g. `12.` or `12e` or `-`
   const trailingNum = str.match(/([0-9]+[eE][+-]?|-?[0-9]+\.|\s-)$/);
   if (trailingNum && trailingNum[1]) {
     const fragment = trailingNum[1].trim();
@@ -360,8 +370,10 @@ function autocompleteTrailingLiteral(str: string): string {
 
 /**
  * Removes trailing commas outside of strings.
+ * @param {string} str
+ * @returns {string}
  */
-function removeTrailingComma(str: string): string {
+function removeTrailingComma(str) {
   let end = str.length - 1;
   while (end >= 0 && (str[end] === " " || str[end] === "\t" || str[end] === "\n" || str[end] === "\r")) {
     end--;
@@ -375,19 +387,17 @@ function removeTrailingComma(str: string): string {
 /**
  * If an object ends with a closed key string but no colon (e.g. `{"user": "Alice", "bio"` -> `{"user": "Alice", "bio"}`),
  * complete it with a colon and the incompleteValue.
+ * @param {string} str
+ * @param {Array<string>} stack
+ * @param {RepairOptions} opts
+ * @returns {string}
  */
-function fixUnfinishedObjectProperty(
-  str: string,
-  stack: Array<"{" | "[">,
-  opts: Required<RepairOptions>
-): string {
+function fixUnfinishedObjectProperty(str, stack, opts) {
   if (stack.length === 0 || stack[stack.length - 1] !== "{") {
     return str;
   }
 
   const trimmed = str.trimEnd();
-  // Check if string ends with a key string preceded by comma or opening brace
-  // e.g. `{"key"` or `, "key"`
   const keyOnlyMatch = trimmed.match(/([{,]\s*)"([^"\\]*(?:\\.[^"\\]*)*)"\s*$/);
   if (keyOnlyMatch) {
     const valString = JSON.stringify(opts.incompleteValue);
@@ -399,12 +409,13 @@ function fixUnfinishedObjectProperty(
 
 /**
  * Fallback repair in case exotic nesting or edge syntax caused a parse error.
+ * @param {string} str
+ * @returns {string}
  */
-function fallbackEmergencyRepair(str: string): string {
+function fallbackEmergencyRepair(str) {
   try {
     return JSON.stringify(JSON.parse(str));
   } catch {
-    // Count unmatched brackets
     let openBraces = 0;
     let openBrackets = 0;
     let inStr = false;
@@ -437,7 +448,6 @@ function fallbackEmergencyRepair(str: string): string {
       JSON.parse(fixed);
       return fixed;
     } catch {
-      // If all else fails, return an empty object or array based on first char
       if (str.trim().startsWith("[")) return "[]";
       return "{}";
     }
