@@ -2,7 +2,7 @@ import {
   repairJson,
   parsePartialJson,
   safeParsePartialJson,
-} from "../src/index.js";
+} from "../dist/index.js";
 
 // 1. Repairing a truncated JSON string
 const truncated = '{"user": {"name": "Ekansh", "skills": ["Node.js", "JavaScr';

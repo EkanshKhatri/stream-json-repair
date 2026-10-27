@@ -1,39 +1,25 @@
 import { repairJson } from "./repair.js";
-
-/**
- * @typedef {import('./repair.js').RepairOptions} RepairOptions
- */
-
-/**
- * @typedef {RepairOptions & { onError?: (error: Error, rawChunk: string) => void }} StreamJsonOptions
- */
-
-/**
- * @template T
- * @typedef {Object} StreamSnapshot
- * @property {string} raw - The raw cumulative text received so far.
- * @property {string} repaired - The valid repaired JSON string.
- * @property {T} value - The parsed JavaScript object.
- * @property {boolean} isComplete - True if the JSON structure is completely closed without synthetic repairs.
- */
+import type { StreamJsonOptions, StreamSnapshot } from "./types.js";
 
 /**
  * Creates an AsyncGenerator that consumes chunks from an AsyncIterable<string>
  * and yields updated parsed snapshots as tokens stream in.
  *
- * @template T
- * @param {AsyncIterable<string>} asyncIterable - An async stream or generator of string chunks (e.g. OpenAI/Gemini/Fetch stream).
- * @param {StreamJsonOptions} [options] - Stream repair options.
- * @returns {AsyncGenerator<StreamSnapshot<T>, void, unknown>}
+ * @template T - The parsed object schema type.
+ * @param asyncIterable - An async stream or generator of string chunks (e.g. OpenAI/Gemini/Fetch stream).
+ * @param options - Stream repair options.
  *
  * @example
- * ```js
- * for await (const snapshot of parseJsonStream(tokenChunks)) {
+ * ```ts
+ * for await (const snapshot of parseJsonStream<MySchema>(tokenChunks)) {
  *   console.log("Current object:", snapshot.value);
  * }
  * ```
  */
-export async function* parseJsonStream(asyncIterable, options) {
+export async function* parseJsonStream<T = unknown>(
+  asyncIterable: AsyncIterable<string>,
+  options?: StreamJsonOptions
+): AsyncGenerator<StreamSnapshot<T>, void, unknown> {
   let accumulated = "";
 
   for await (const chunk of asyncIterable) {
@@ -52,7 +38,7 @@ export async function* parseJsonStream(asyncIterable, options) {
         isComplete = false;
       }
 
-      const value = JSON.parse(repaired);
+      const value = JSON.parse(repaired) as T;
 
       yield {
         raw: accumulated,
@@ -70,25 +56,23 @@ export async function* parseJsonStream(asyncIterable, options) {
 
 /**
  * Creates a standard Web API TransformStream that transforms a stream of string chunks
- * into a stream of StreamSnapshot objects.
+ * into a stream of StreamSnapshot<T> objects.
  *
  * Compatible with Node.js 18+, Bun, Deno, Cloudflare Workers, and modern browsers.
  *
- * @template T
- * @param {StreamJsonOptions} [options]
- * @returns {TransformStream<string, StreamSnapshot<T>>}
- *
  * @example
- * ```js
+ * ```ts
  * const stream = fetchResponse.body
  *   .pipeThrough(new TextDecoderStream())
- *   .pipeThrough(createJsonTransformStream());
+ *   .pipeThrough(createJsonTransformStream<MyData>());
  * ```
  */
-export function createJsonTransformStream(options) {
+export function createJsonTransformStream<T = unknown>(
+  options?: StreamJsonOptions
+): TransformStream<string, StreamSnapshot<T>> {
   let accumulated = "";
 
-  return new TransformStream({
+  return new TransformStream<string, StreamSnapshot<T>>({
     transform(chunk, controller) {
       if (!chunk) return;
       accumulated += chunk;
@@ -105,7 +89,7 @@ export function createJsonTransformStream(options) {
           isComplete = false;
         }
 
-        const value = JSON.parse(repaired);
+        const value = JSON.parse(repaired) as T;
 
         controller.enqueue({
           raw: accumulated,

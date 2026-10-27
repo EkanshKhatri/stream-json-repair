@@ -1,4 +1,4 @@
-import { repairJson } from "../src/repair.js";
+import { repairJson } from "../dist/index.js";
 
 console.log("=================================================");
 console.log("🚀 stream-json-repair Performance Benchmark (Pure JS)");

@@ -1,4 +1,4 @@
-import { parseJsonStream } from "../src/index.js";
+import { parseJsonStream } from "../dist/index.js";
 
 /**
  * Example demonstrating how stream-json-repair integrates with

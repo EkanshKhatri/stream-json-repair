@@ -1,11 +1,6 @@
-/**
- * @typedef {Object} RepairOptions
- * @property {boolean} [stripMarkdown=true] - If true, automatically strips markdown code blocks and conversational text.
- * @property {*} [incompleteValue=null] - Value to assign when an object key has a trailing colon without a value.
- * @property {boolean} [normalizeQuotes=true] - If true, converts single quotes to valid double quotes.
- */
+import type { RepairOptions } from "./types.js";
 
-const DEFAULT_OPTIONS = {
+const DEFAULT_OPTIONS: Required<RepairOptions> = {
   stripMarkdown: true,
   incompleteValue: null,
   normalizeQuotes: true,
@@ -14,12 +9,12 @@ const DEFAULT_OPTIONS = {
 /**
  * Repairs a truncated, partial, or malformed JSON string into valid parseable JSON.
  *
- * @param {string} input - The raw or streaming JSON string to repair.
- * @param {RepairOptions} [options] - Customization options for stripping markdown, fallback values, etc.
- * @returns {string} A guaranteed valid JSON string that can be parsed with `JSON.parse()`.
+ * @param input - The raw or streaming JSON string to repair.
+ * @param options - Customization options for stripping markdown, fallback values, etc.
+ * @returns A guaranteed valid JSON string that can be parsed with `JSON.parse()`.
  */
-export function repairJson(input, options = {}) {
-  const opts = { ...DEFAULT_OPTIONS, ...options };
+export function repairJson(input: string, options?: RepairOptions): string {
+  const opts: Required<RepairOptions> = { ...DEFAULT_OPTIONS, ...options };
 
   if (!input || typeof input !== "string") {
     return "";
@@ -52,10 +47,8 @@ export function repairJson(input, options = {}) {
 
 /**
  * Extracts JSON content if wrapped in markdown code blocks or preceded by LLM explanations.
- * @param {string} text
- * @returns {string}
  */
-function extractJsonFromMarkdown(text) {
+function extractJsonFromMarkdown(text: string): string {
   let cleaned = text.trim();
 
   // Strip trailing markdown backticks if any (e.g. from stream interruption)
@@ -113,16 +106,13 @@ function extractJsonFromMarkdown(text) {
 /**
  * State machine parser that tracks brackets, strings, escapes, and literals
  * to synthesize a complete and valid JSON document.
- * @param {string} text
- * @param {RepairOptions} opts
- * @returns {string}
  */
-function runStateMachineRepair(text, opts) {
+function runStateMachineRepair(text: string, opts: Required<RepairOptions>): string {
   let result = "";
-  const stack = [];
+  const stack: Array<"{" | "["> = [];
 
   let inString = false;
-  let stringQuoteChar = '"';
+  let stringQuoteChar: '"' | "'" = '"';
   let isEscaped = false;
   let lastNonWhitespace = "";
 
@@ -130,7 +120,7 @@ function runStateMachineRepair(text, opts) {
   let i = 0;
 
   while (i < len) {
-    const char = text[i];
+    const char = text[i]!;
 
     // Inside a string literal
     if (inString) {
@@ -194,7 +184,7 @@ function runStateMachineRepair(text, opts) {
     }
 
     // Handle leading '+' on numbers: e.g. +42 -> 42
-    if (char === "+" && i + 1 < len && /[0-9]/.test(text[i + 1])) {
+    if (char === "+" && i + 1 < len && /[0-9]/.test(text[i + 1]!)) {
       i++;
       continue;
     }
@@ -209,7 +199,6 @@ function runStateMachineRepair(text, opts) {
 
     // Handle Infinity or -Infinity -> null
     if (char === "I" && text.substring(i, i + 8) === "Infinity") {
-      // Check if preceded by '-'
       if (result.trimEnd().endsWith("-")) {
         result = result.trimEnd().slice(0, -1);
       }
@@ -221,7 +210,7 @@ function runStateMachineRepair(text, opts) {
 
     // Handle Hexadecimal numbers: e.g. 0xFF -> 255
     if (char === "0" && i + 1 < len && (text[i + 1] === "x" || text[i + 1] === "X")) {
-      let hexMatch = text.substring(i).match(/^0[xX][0-9a-fA-F]+/);
+      const hexMatch = text.substring(i).match(/^0[xX][0-9a-fA-F]+/);
       if (hexMatch) {
         const hexStr = hexMatch[0];
         const decVal = parseInt(hexStr, 16);
@@ -235,7 +224,7 @@ function runStateMachineRepair(text, opts) {
     // Start of string
     if (char === '"' || (char === "'" && opts.normalizeQuotes)) {
       inString = true;
-      stringQuoteChar = char;
+      stringQuoteChar = char as '"' | "'";
       result += '"';
       lastNonWhitespace = '"';
       i++;
@@ -310,8 +299,8 @@ function runStateMachineRepair(text, opts) {
       /[a-zA-Z_$]/.test(char)
     ) {
       let keyIdent = "";
-      while (i < len && /[a-zA-Z0-9_$-]/.test(text[i])) {
-        keyIdent += text[i];
+      while (i < len && /[a-zA-Z0-9_$-]/.test(text[i]!)) {
+        keyIdent += text[i]!;
         i++;
       }
 
@@ -366,7 +355,7 @@ function runStateMachineRepair(text, opts) {
 
   // 6. Close all remaining unclosed containers from the stack
   while (stack.length > 0) {
-    const top = stack.pop();
+    const top = stack.pop()!;
     result = removeTrailingComma(result);
     if (top === "{") {
       result += "}";
@@ -388,11 +377,8 @@ function runStateMachineRepair(text, opts) {
 /**
  * Closes an unclosed string safely, handling trailing single backslashes
  * and incomplete Unicode escapes (\uXXXX).
- * @param {string} str
- * @param {boolean} endsWithBackslash
- * @returns {string}
  */
-function closeUnterminatedString(str, endsWithBackslash) {
+function closeUnterminatedString(str: string, endsWithBackslash: boolean): string {
   if (endsWithBackslash) {
     str += "\\";
   } else {
@@ -407,10 +393,8 @@ function closeUnterminatedString(str, endsWithBackslash) {
 
 /**
  * Autocompletes trailing incomplete numbers or boolean/null literals.
- * @param {string} str
- * @returns {string}
  */
-function autocompleteTrailingLiteral(str) {
+function autocompleteTrailingLiteral(str: string): string {
   const trailingWord = str.match(/([a-zA-Z]+)$/);
   if (trailingWord && trailingWord[1]) {
     const word = trailingWord[1];
@@ -447,10 +431,8 @@ function autocompleteTrailingLiteral(str) {
 
 /**
  * Removes trailing commas outside of strings.
- * @param {string} str
- * @returns {string}
  */
-function removeTrailingComma(str) {
+function removeTrailingComma(str: string): string {
   let end = str.length - 1;
   while (end >= 0 && (str[end] === " " || str[end] === "\t" || str[end] === "\n" || str[end] === "\r")) {
     end--;
@@ -464,12 +446,12 @@ function removeTrailingComma(str) {
 /**
  * If an object ends with a closed key string but no colon (e.g. `{"user": "Alice", "bio"` -> `{"user": "Alice", "bio"}`),
  * complete it with a colon and the incompleteValue.
- * @param {string} str
- * @param {Array<string>} stack
- * @param {RepairOptions} opts
- * @returns {string}
  */
-function fixUnfinishedObjectProperty(str, stack, opts) {
+function fixUnfinishedObjectProperty(
+  str: string,
+  stack: Array<"{" | "[">,
+  opts: Required<RepairOptions>
+): string {
   if (stack.length === 0 || stack[stack.length - 1] !== "{") {
     return str;
   }
@@ -486,10 +468,8 @@ function fixUnfinishedObjectProperty(str, stack, opts) {
 
 /**
  * Fallback repair in case exotic nesting or edge syntax caused a parse error.
- * @param {string} str
- * @returns {string}
  */
-function fallbackEmergencyRepair(str) {
+function fallbackEmergencyRepair(str: string): string {
   try {
     return JSON.stringify(JSON.parse(str));
   } catch {

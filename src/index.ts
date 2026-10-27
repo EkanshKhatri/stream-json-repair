@@ -8,5 +8,17 @@
  */
 
 export { repairJson } from "./repair.js";
-export { parsePartialJson, safeParsePartialJson } from "./parse.js";
-export { parseJsonStream, createJsonTransformStream } from "./stream.js";
+export {
+  parsePartialJson,
+  safeParsePartialJson,
+} from "./parse.js";
+export {
+  parseJsonStream,
+  createJsonTransformStream,
+} from "./stream.js";
+export type {
+  RepairOptions,
+  StreamJsonOptions,
+  StreamSnapshot,
+  SafeParseResult,
+} from "./types.js";
