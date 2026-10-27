@@ -252,6 +252,7 @@ function runStateMachineRepair(text: string, opts: Required<RepairOptions>): str
     if (char === "}") {
       if (stack.length > 0 && stack[stack.length - 1] === "{") {
         stack.pop();
+        result = autocompleteTrailingLiteral(result);
         result = removeTrailingComma(result);
         result += "}";
         lastNonWhitespace = "}";
@@ -263,6 +264,7 @@ function runStateMachineRepair(text: string, opts: Required<RepairOptions>): str
     if (char === "]") {
       if (stack.length > 0 && stack[stack.length - 1] === "[") {
         stack.pop();
+        result = autocompleteTrailingLiteral(result);
         result = removeTrailingComma(result);
         result += "]";
         lastNonWhitespace = "]";
@@ -283,6 +285,7 @@ function runStateMachineRepair(text: string, opts: Required<RepairOptions>): str
 
     // Element/property separator: ignore duplicate commas e.g. `,,`
     if (char === ",") {
+      result = autocompleteTrailingLiteral(result);
       if (lastNonWhitespace !== "{" && lastNonWhitespace !== "[" && lastNonWhitespace !== ",") {
         result += ",";
         lastNonWhitespace = ",";
