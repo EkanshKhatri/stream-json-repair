@@ -24,12 +24,12 @@ JSON.parse('{"user": {"name": "Alice"');
 Traditional workarounds either wait until the entire generation finishes (defeating the purpose of streaming) or use bulky AST compilers that choke on partial tokens.
 
 **`stream-json-repair` solves this problem with an incremental lexical state machine:**
-* ✅ **Pure JavaScript (Native Node.js ESM):** Zero build step required. Runs directly in Node.js, Bun, Deno, Next.js, and modern browsers.
+* ✅ **Dual TypeScript & JavaScript Support:** Written in strict TypeScript with full generic typings, built into dual ESM (`dist/index.js`) and CommonJS (`dist/index.cjs`) bundles.
 * ✅ **Real-Time Streaming:** Repairs truncated JSON token-by-token so your UI can render live cards, tables, or progress indicators instantly.
-* ✅ **Zero Dependencies:** Pure JavaScript, zero external packages, and < 3 KB gzipped.
+* ✅ **Zero Dependencies:** Pure self-contained code, zero external runtime packages, and < 4 KB gzipped.
 * ✅ **Ultra-Fast:** Over **140,000 ops/sec** (~7 µs per repair) in production benchmarks.
-* ✅ **First-Class JSDoc & TypeScript Typings:** Ships with full `index.d.ts` declarations and JSDoc for perfect autocompletion in VS Code and TypeScript projects.
-* ✅ **Handles LLM Quirks:** Automatically strips ````json ```` fences, leading conversational text, Python-style single quotes, comments, and unclosed Unicode escapes.
+* ✅ **Full Type Safety:** Ships with full `.d.ts` declaration files for perfect autocompletion in VS Code, WebStorm, and TypeScript projects.
+* ✅ **Handles LLM Quirks:** Automatically strips ````json ```` fences, leading conversational text, unquoted keys, `NaN`/`Infinity`, Python-style single quotes, comments, and unclosed Unicode escapes.
 
 ---
 
@@ -55,7 +55,11 @@ bun add stream-json-repair
 
 ### 1. Repairing a Truncated JSON String
 ```ts
+// ESM / TypeScript
 import { repairJson } from "stream-json-repair";
+
+// CommonJS
+// const { repairJson } = require("stream-json-repair");
 
 const partial = '{"title": "Paneer Tikka", "tags": ["Indian", "Vegetarian';
 const validJson = repairJson(partial);
