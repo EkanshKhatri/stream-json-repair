@@ -1,0 +1,65 @@
+{
+  "name": "stream-json-repair",
+  "version": "1.0.0",
+  "description": "Ultra-fast, zero-dependency streaming JSON parser & repair engine for LLM token streams (OpenAI, Gemini, Claude, Ollama) that auto-completes incomplete JSON in real-time.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "bench": "tsx bench/benchmark.ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm run build && npm test"
+  },
+  "keywords": [
+    "json",
+    "stream",
+    "repair",
+    "partial-json",
+    "llm",
+    "ai",
+    "openai",
+    "gemini",
+    "claude",
+    "ollama",
+    "parser",
+    "streaming-json",
+    "zero-dependency",
+    "transform-stream"
+  ],
+  "author": "Ekansh Khatri <ekanshkhatri@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ekanshkhatri/stream-json-repair.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ekanshkhatri/stream-json-repair/issues"
+  },
+  "homepage": "https://github.com/ekanshkhatri/stream-json-repair#readme",
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@vitest/coverage-v8": "^5.0.5",
+    "tsup": "^9.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}
