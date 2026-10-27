@@ -58,11 +58,13 @@ export function repairJson(input, options = {}) {
 function extractJsonFromMarkdown(text) {
   let cleaned = text.trim();
 
+  // Strip trailing markdown backticks if any (e.g. from stream interruption)
+  cleaned = cleaned.replace(/`+$/, "").trim();
+
   // Handle opening markdown code fences like ```json, ```JSON, or ```
   const codeBlockMatch = cleaned.match(/^```(?:json|JSON)?\s*([\s\S]*)$/);
   if (codeBlockMatch && codeBlockMatch[1] !== undefined) {
     cleaned = codeBlockMatch[1].trim();
-    // If there is a trailing closing fence, strip everything after it
     const closingFenceIndex = cleaned.lastIndexOf("```");
     if (closingFenceIndex !== -1) {
       cleaned = cleaned.substring(0, closingFenceIndex).trim();
@@ -70,9 +72,22 @@ function extractJsonFromMarkdown(text) {
     return cleaned;
   }
 
+  // Check if LLM emitted prose before the first '{' or '['
+  const firstBrace = cleaned.indexOf("{");
+  const firstBracket = cleaned.indexOf("[");
+
+  let firstJsonStart = -1;
+  if (firstBrace !== -1 && firstBracket !== -1) {
+    firstJsonStart = Math.min(firstBrace, firstBracket);
+  } else if (firstBrace !== -1) {
+    firstJsonStart = firstBrace;
+  } else if (firstBracket !== -1) {
+    firstJsonStart = firstBracket;
+  }
+
   // Check if LLM emitted conversational text before a markdown block
   const fenceIndex = cleaned.indexOf("```");
-  if (fenceIndex !== -1) {
+  if (fenceIndex !== -1 && (firstJsonStart === -1 || fenceIndex < firstJsonStart)) {
     const afterFence = cleaned.substring(fenceIndex);
     const innerMatch = afterFence.match(/^```(?:json|JSON)?\s*([\s\S]*)$/);
     if (innerMatch && innerMatch[1] !== undefined) {
@@ -85,22 +100,12 @@ function extractJsonFromMarkdown(text) {
     }
   }
 
-  // Check if LLM emitted prose before the first '{' or '['
-  const firstBrace = cleaned.indexOf("{");
-  const firstBracket = cleaned.indexOf("[");
-
-  let startIdx = -1;
-  if (firstBrace !== -1 && firstBracket !== -1) {
-    startIdx = Math.min(firstBrace, firstBracket);
-  } else if (firstBrace !== -1) {
-    startIdx = firstBrace;
-  } else if (firstBracket !== -1) {
-    startIdx = firstBracket;
+  if (firstJsonStart > 0) {
+    cleaned = cleaned.substring(firstJsonStart).trim();
   }
 
-  if (startIdx > 0) {
-    cleaned = cleaned.substring(startIdx).trim();
-  }
+  // Strip trailing unclosed markdown backticks if any
+  cleaned = cleaned.replace(/`+$/, "").trim();
 
   return cleaned;
 }
@@ -130,28 +135,30 @@ function runStateMachineRepair(text, opts) {
     // Inside a string literal
     if (inString) {
       if (isEscaped) {
-        // Current character is escaped
         result += char;
         isEscaped = false;
       } else if (char === "\\") {
         result += char;
         isEscaped = true;
       } else if (char === stringQuoteChar) {
-        // String ended
         inString = false;
-        result += '"'; // always standardize to double quote
+        result += '"';
         lastNonWhitespace = '"';
       } else {
         if (char === '"' && stringQuoteChar === "'") {
-          // Inside a single-quoted string, escape inner double quotes
           result += '\\"';
         } else if (char === "\n") {
-          // JSON strings cannot contain raw unescaped newlines
           result += "\\n";
         } else if (char === "\r") {
           result += "\\r";
         } else if (char === "\t") {
           result += "\\t";
+        } else if (char === "\b") {
+          result += "\\b";
+        } else if (char === "\f") {
+          result += "\\f";
+        } else if (char.charCodeAt(0) < 0x20) {
+          result += "\\u" + char.charCodeAt(0).toString(16).padStart(4, "0");
         } else {
           result += char;
         }
@@ -164,14 +171,12 @@ function runStateMachineRepair(text, opts) {
     if (char === "/" && i + 1 < len) {
       const nextChar = text[i + 1];
       if (nextChar === "/") {
-        // Single line comment: skip until newline
         i += 2;
         while (i < len && text[i] !== "\n" && text[i] !== "\r") {
           i++;
         }
         continue;
       } else if (nextChar === "*") {
-        // Multiline comment: skip until */
         i += 2;
         while (i + 1 < len && !(text[i] === "*" && text[i + 1] === "/")) {
           i++;
@@ -186,6 +191,45 @@ function runStateMachineRepair(text, opts) {
       result += char;
       i++;
       continue;
+    }
+
+    // Handle leading '+' on numbers: e.g. +42 -> 42
+    if (char === "+" && i + 1 < len && /[0-9]/.test(text[i + 1])) {
+      i++;
+      continue;
+    }
+
+    // Handle NaN -> null
+    if (char === "N" && text.substring(i, i + 3) === "NaN") {
+      result += "null";
+      lastNonWhitespace = "l";
+      i += 3;
+      continue;
+    }
+
+    // Handle Infinity or -Infinity -> null
+    if (char === "I" && text.substring(i, i + 8) === "Infinity") {
+      // Check if preceded by '-'
+      if (result.trimEnd().endsWith("-")) {
+        result = result.trimEnd().slice(0, -1);
+      }
+      result += "null";
+      lastNonWhitespace = "l";
+      i += 8;
+      continue;
+    }
+
+    // Handle Hexadecimal numbers: e.g. 0xFF -> 255
+    if (char === "0" && i + 1 < len && (text[i + 1] === "x" || text[i + 1] === "X")) {
+      let hexMatch = text.substring(i).match(/^0[xX][0-9a-fA-F]+/);
+      if (hexMatch) {
+        const hexStr = hexMatch[0];
+        const decVal = parseInt(hexStr, 16);
+        result += decVal;
+        lastNonWhitespace = String(decVal).slice(-1);
+        i += hexStr.length;
+        continue;
+      }
     }
 
     // Start of string
@@ -219,7 +263,6 @@ function runStateMachineRepair(text, opts) {
     if (char === "}") {
       if (stack.length > 0 && stack[stack.length - 1] === "{") {
         stack.pop();
-        // Remove trailing comma if present before }
         result = removeTrailingComma(result);
         result += "}";
         lastNonWhitespace = "}";
@@ -231,7 +274,6 @@ function runStateMachineRepair(text, opts) {
     if (char === "]") {
       if (stack.length > 0 && stack[stack.length - 1] === "[") {
         stack.pop();
-        // Remove trailing comma if present before ]
         result = removeTrailingComma(result);
         result += "]";
         lastNonWhitespace = "]";
@@ -240,23 +282,55 @@ function runStateMachineRepair(text, opts) {
       continue;
     }
 
-    // Key-value separator
+    // Key-value separator: ignore duplicate colons e.g. `::`
     if (char === ":") {
-      result += ":";
-      lastNonWhitespace = ":";
+      if (lastNonWhitespace !== ":") {
+        result += ":";
+        lastNonWhitespace = ":";
+      }
       i++;
       continue;
     }
 
-    // Element/property separator
+    // Element/property separator: ignore duplicate commas e.g. `,,`
     if (char === ",") {
-      // Don't emit multiple consecutive commas or commas immediately after { or [
       if (lastNonWhitespace !== "{" && lastNonWhitespace !== "[" && lastNonWhitespace !== ",") {
         result += ",";
         lastNonWhitespace = ",";
       }
       i++;
       continue;
+    }
+
+    // Handle Unquoted Object Keys: e.g. `{ name: "Bob" }` or `{ age:`
+    if (
+      stack.length > 0 &&
+      stack[stack.length - 1] === "{" &&
+      (lastNonWhitespace === "{" || lastNonWhitespace === ",") &&
+      /[a-zA-Z_$]/.test(char)
+    ) {
+      let keyIdent = "";
+      while (i < len && /[a-zA-Z0-9_$-]/.test(text[i])) {
+        keyIdent += text[i];
+        i++;
+      }
+
+      // Peek next non-whitespace char
+      let peekIdx = i;
+      while (peekIdx < len && (text[peekIdx] === " " || text[peekIdx] === "\t" || text[peekIdx] === "\n" || text[peekIdx] === "\r")) {
+        peekIdx++;
+      }
+
+      // If followed by ':' or at EOF, wrap as a quoted key!
+      if (peekIdx >= len || text[peekIdx] === ":") {
+        result += '"' + keyIdent + '"';
+        lastNonWhitespace = '"';
+        continue;
+      } else {
+        result += keyIdent;
+        lastNonWhitespace = keyIdent.slice(-1);
+        continue;
+      }
     }
 
     // Literals, numbers, or unfinished identifiers
@@ -347,6 +421,9 @@ function autocompleteTrailingLiteral(str) {
       return str.slice(0, -word.length) + "false";
     }
     if ("null".startsWith(word)) {
+      return str.slice(0, -word.length) + "null";
+    }
+    if ("NaN".startsWith(word)) {
       return str.slice(0, -word.length) + "null";
     }
   }

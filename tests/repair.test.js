@@ -205,4 +205,85 @@ describe("repairJson", () => {
       expect(JSON.parse(repaired)).toEqual({ a: 1, b: 2 });
     });
   });
+
+  describe("Advanced Real-World Edge Cases", () => {
+    it("repairs unquoted object keys", () => {
+      const input = '{ name: "Ekansh", age: 24, is_admin: true }';
+      const repaired = repairJson(input);
+      expect(JSON.parse(repaired)).toEqual({
+        name: "Ekansh",
+        age: 24,
+        is_admin: true,
+      });
+    });
+
+    it("repairs incomplete unquoted object keys at stream EOF", () => {
+      const input = '{ name: "Ekansh", tit';
+      const repaired = repairJson(input);
+      expect(JSON.parse(repaired)).toEqual({
+        name: "Ekansh",
+        tit: null,
+      });
+    });
+
+    it("converts NaN and Infinity to valid JSON null", () => {
+      const input = '{"score": NaN, "max": Infinity, "min": -Infinity}';
+      const repaired = repairJson(input);
+      expect(JSON.parse(repaired)).toEqual({
+        score: null,
+        max: null,
+        min: null,
+      });
+    });
+
+    it("normalizes numbers with leading plus sign", () => {
+      const input = '{"positive": +42, "temperature": +15.5}';
+      const repaired = repairJson(input);
+      expect(JSON.parse(repaired)).toEqual({
+        positive: 42,
+        temperature: 15.5,
+      });
+    });
+
+    it("converts hexadecimal numbers to decimal", () => {
+      const input = '{"color": 0xFF, "port": 0x1F}';
+      const repaired = repairJson(input);
+      expect(JSON.parse(repaired)).toEqual({
+        color: 255,
+        port: 31,
+      });
+    });
+
+    it("handles trailing bare opening brace inside array", () => {
+      const input = '[{"id": 1}, {';
+      const repaired = repairJson(input);
+      expect(JSON.parse(repaired)).toEqual([{ id: 1 }, {}]);
+    });
+
+    it("handles trailing bare opening bracket inside object", () => {
+      const input = '{"matrix": [[1, 2], [';
+      const repaired = repairJson(input);
+      expect(JSON.parse(repaired)).toEqual({ matrix: [[1, 2], []] });
+    });
+
+    it("safely escapes unescaped raw control characters inside strings", () => {
+      const input = '{"raw": "line 1\nline 2\ttabbed\bback"}';
+      const repaired = repairJson(input);
+      expect(JSON.parse(repaired)).toEqual({
+        raw: "line 1\nline 2\ttabbed\bback",
+      });
+    });
+
+    it("handles double colons gracefully", () => {
+      const input = '{"key":: "value"}';
+      const repaired = repairJson(input);
+      expect(JSON.parse(repaired)).toEqual({ key: "value" });
+    });
+
+    it("strips trailing unclosed markdown backticks", () => {
+      const input = '{"status": "ok"} ```';
+      const repaired = repairJson(input);
+      expect(JSON.parse(repaired)).toEqual({ status: "ok" });
+    });
+  });
 });

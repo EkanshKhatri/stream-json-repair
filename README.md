@@ -171,6 +171,11 @@ Consumes an asynchronous generator or stream of string chunks and yields continu
 
 | Scenario | Input | Repaired Output |
 | :--- | :--- | :--- |
+| **Unquoted Object Keys** | `'{ name: "Alice", age: 30 }'` | `'{"name": "Alice", "age": 30}'` |
+| **Incomplete Unquoted Key** | `'{ name: "Alice", tit'` | `'{"name": "Alice", "tit": null}'` |
+| **NaN & Infinity** | `'{"score": NaN, "limit": Infinity}'` | `'{"score": null, "limit": null}'` |
+| **Leading Plus on Numbers** | `'{"temp": +25.5}'` | `'{"temp": 25.5}'` |
+| **Hexadecimal Numbers** | `'{"color": 0xFF, "port": 0x1F}'` | `'{"color": 255, "port": 31}'` |
 | **Unclosed strings** | `'{"name": "Alice'` | `'{"name": "Alice"}'` |
 | **Escaped quotes** | `'{"bio": "Software \"eng'` | `'{"bio": "Software \"eng"}'` |
 | **Trailing backslashes** | `'{"path": "C:\\\\Windows\\\\'` | `'{"path": "C:\\\\Windows\\\\"}'` |
@@ -180,8 +185,12 @@ Consumes an asynchronous generator or stream of string chunks and yields continu
 | **Incomplete nulls** | `'{"data": nul'` | `'{"data": null}'` |
 | **Incomplete numbers** | `'{"rate": 12.'` | `'{"rate": 12.0}'` |
 | **Trailing colons** | `'{"user": '` | `'{"user": null}'` |
+| **Trailing open containers** | `'[{"id": 1}, {'` | `'[{"id": 1}, {}]'` |
+| **Control chars in strings** | `'{"msg": "line 1\nline 2"}'` (raw) | `'{"msg": "line 1\\nline 2"}'` |
+| **Duplicate colons / commas**| `'{"key":: "val",,, "b": 1}'` | `'{"key": "val", "b": 1}'` |
 | **Markdown blocks** | ```` ```json\n{"val": 1} ```` | `'{"val": 1}'` |
 | **Conversational prose** | `'Sure! Here is the JSON: {"a": 1'` | `'{"a": 1}'` |
+| **Trailing backticks** | `'{"status": "ok"} ```'` | `'{"status": "ok"}'` |
 
 ---
 
